@@ -1,0 +1,2 @@
+删除自带的jdk：rpm -qa | grep -i java | xargs -n1 rpm -e --nodeps
+服务器之间传递文件 scp -r /etc/profile root@node1:/etc/profile （！！！后面不带斜杠）
