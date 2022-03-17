@@ -1,0 +1,10 @@
+<configuration>
+    <property>
+        <name>hbase.rootdir</name>
+        <value>file:///home/pythoner/hbase/rootdir</value>
+    </property>
+    <property>
+        <name>hbase.zookeeper.property.dataDir</name>
+        <value>/home/pythoner/hbase/zookeeper</value>
+    </property>
+</configuration>

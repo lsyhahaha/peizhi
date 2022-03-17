@@ -1,0 +1,153 @@
+一、准备工作，最好要有xshell6，配好IP后就可以用了，已上传：
+1、设置eth0 ip地址参考 设置网络.txt(已上传)，这里设置eth0 ip 为 192.168.33.2，以下配置以此ip为准，自己设置的ip以下的配置要以自己ip为准。要保证eth0和外面vmnet8互相ping通。这里可以选配vsftpd服务器，参考vsftpd.txt，以便上传下载方便。
+2、service NetworkManager stop, chkconfig NetworkManager off，关闭NetworkManager服务。
+3、vi /etc/hosts，删除所有内容，添加一条 192.168.33.2 huang localhost（huang为计算机名，自己的linux计算机名不同的话下面的配置部分得修改为自己的计算机名），重启后登录提示应该是huang而不是localhost了。
+4、U盘上传apache-zookeeper-3.5.9-bin.tar.gz、hadoop-2.9.2.tar.gz、hbase-2.2.6-bin.tar.gz、jdk-8u281-linux-i586.tar.gz到linux系统中，这几个经测试是兼容的。
+5、创建hadoop用户，并在/etc/sudoers中添加hadoop为sudoers，在这个文件中找到root ALL=(ALL) ALL 这行，然后在这行下面增加一行内容：hadoop ALL=(ALL) ALL
+6、将这几个软件分别解压缩到/usr/local/zookeeper，/usr/local/hbase，/usr/local/jdk18及/usr/local/hadoop目录中，以Hadoop为例：
+tar -zxvf hadoop-2.9.2.tar.gz -C /usr/local, mv hadoop-2.9.2 hadoop，两步骤就可以了，其他的解压及改名类似。这三个文件夹全部 chown -R hadoop:hadoop 文件夹名，改权限。jdk的环境变量参考及别的软件的环境变量设置参考第7条。
+7、vi /etc/profile，最后面加上（此处我一次性把hive，hbase，jdk，hadoop配好）
+export HADOOP_HOME=/usr/local/hadoop
+export HADOOP_INSTALL=$HADOOP_HOME
+export HADOOP_MAPRED_HOME=$HADOOP_HOME
+export HADOOP_COMMON_HOME=$HADOOP_HOME
+export HADOOP_HDFS_HOME=$HADOOP_HOME
+export YARN_HOME=$HADOOP_HOME
+export HADOOP_COMMON_LIB_NATIVE_DIR=$HADOOP_HOME/lib/native
+export HIVE_HOME=/usr/local/hive
+JAVA_HOME=/usr/local/jdk18
+CLASSPATH=.:$JAVA_HOME/lib/rt.jar
+PATH=$JAVA_HOME/bin:/usr/local/hive/bin:/usr/local/hbase/bin:/usr/local/zookeeper/bin:$HADOOP_HOME/sbin:$HADOOP_HOME/bin:$PATH
+export JAVA_HOME CLASSPATH PATH
+存盘退出后，source /etc/profile，最好退回到hadoop用户再source一下。此时java -version命令可以执行并显示 java version "1.8.0_281"就可以了。
+
+二、安装hadoop
+去除警告：log4j.logger.org.apache.hadoop.util.NativeCodeLoader=ERROR
+1、切换到hadoop用户后（如无说明下面就都是此用户），配ssh登录。
+(1)ssh localhost
+此时会有如下提示(SSH首次登陆提示)，输入 yes 。然后按提示输入密码 hadoop，这样就登陆到本机了。输入 exit 退出刚才的 ssh，就回到了我们原先的终端窗口.
+(2)cd ~/.ssh/                     # 若没有该目录，请先执行一次ssh localhost
+ssh-keygen -t rsa              # 会有提示，都按回车就可以
+cat id_rsa.pub >> authorized_keys  # 加入授权
+chmod 600 ./authorized_keys    # 修改文件权限
+执行好之后，再用 ssh localhost 命令，无需输入密码就可以直接登陆了。
+2、进入/usr/local/hadoop/etc/hadoop/，修改两个文件core-site.xml 和 hdfs-site.xml。
+修改配置文件 core-site.xml，将内容删光，然后写上：
+<configuration>
+    <property>
+        <name>hadoop.tmp.dir</name>
+        <value>file:/usr/local/hadoop/tmp</value>（如无tmp目录，需用hadoop用户在hadoop目录创建tmp目录）
+        <description>Abase for other temporary directories.</description>
+    </property>
+    <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://192.168.33.2:9000</value>
+    </property>
+</configuration>
+修改配置文件 hdfs-site.xml，删光，然后写上：
+<configuration>
+    <property>
+        <name>dfs.replication</name>
+        <value>1</value>
+    </property>
+    <property>
+        <name>dfs.namenode.name.dir</name>
+        <value>file:/usr/local/hadoop/tmp/dfs/name</value>
+    </property>
+    <property>
+        <name>dfs.datanode.data.dir</name>
+        <value>file:/usr/local/hadoop/tmp/dfs/data</value>
+    </property>
+</configuration>
+vi hadoop-env.sh，将包含“export JAVA_HOME=”的这一行改为 export JAVA_HOME=/usr/local/jdk18。
+/usr/local/hadoop中若没有tmp目录自己手动添加。
+3、hdfs namenode -format格式化，成功会显示“successfully formatted” 和 “Exitting with status 0” 的提示，若为 “Exitting with status 1” 则是出错。
+4、start-dfs.sh，一直输入yes，成功后输入jps命令，会有NameNode，SecondaryNameNode，DataNode和jps四个进程。
+5、stop-dfs.sh关闭hadoop，进入/usr/local/hadoop/etc/hadoop/配置mapred-site.xml，需要先执行mv mapred-site.xml.template mapred-site.xml，然后vi此文件：
+<configuration>
+    <property>
+        <name>mapreduce.framework.name</name>
+        <value>yarn</value>
+    </property>
+</configuration>
+修改配置文件 yarn-site.xml：
+<configuration>
+<property>
+        <name>yarn.nodemanager.aux-services</name>
+        <value>mapreduce_shuffle</value>
+</property>
+<property>
+	<name>yarn.resourcemanager.resource-tracker.address</name>
+        <value>hliang:8031</value>
+</property>
+<property>
+        <name>yarn.resourcemanager.address</name>
+        <value>hliang:8032</value>
+</property>
+<property>
+       	<name>yarn.resourcemanager.scheduler.address</name>
+        <value>hliang:8034</value>
+</property>
+<property>
+        <name>yarn.resourcemanager.webapp.address</name>
+        <value>hliang:8088</value>
+</property>
+</configuration>
+6、执行start-all.sh，然后执行jps命令，如有NameNode，SecondaryNameNode，DataNode，NodeManager，Resource Manager和jps六个进程则成功。
+stop-all.sh关闭hadoop，至此hadoop配置成功。
+
+三、配置zookeeper
+1、cd /usr/local/zookeeper/conf，cp zoo_sample.cfg  zoo.cfg，vi zoo.cfg
+加上：
+dataDir=/usr/local/zookeeper/dataDir
+dataLogDir=/usr/local/zookeeper/dataLogDir
+在/usr/local/zookeeper中添加dataDir和dataLogDir。
+2、cp /usr/local/zookeeper/conf/zoo.cfg /usr/local/hbase/conf将配置文件拷贝至hbase conf目录中。
+3、zkServer.sh status，出现standalone字样即为安装成功。
+
+四、配置hbase
+1、cd /usr/local/hbase/conf，vi hbase-env.sh
+export JAVA_HOME=/usr/local/jdk18
+(加入变量，不使用Hbase自带的Zookeeper：)
+export  HBASE_MANAGES_ZK=false，存盘退出。
+2、编辑hbase-site.xml：
+<configuration>
+  <property>
+    <name>hbase.cluster.distributed</name>
+    <value>true</value>
+  </property>
+  <property>
+     <name>hbase.rootdir</name>
+     <value>hdfs://192.168.33.2:9000/hbase</value>
+  </property>
+  <!-- Hbase的web UI端口 -->
+  <property>
+     <name>hbase.master.info.port</name>
+     <value>8171</value>
+  </property>
+  <property>
+        <name>hbase.zookeeper.quorum</name>
+        <value>huang</value>
+  </property>
+  <property>
+    <name>hbase.unsafe.stream.capability.enforce</name>
+    <value>false</value>
+  </property>
+</configuration>
+
+自此配置完成，依次输入命令：
+start-all.sh//开启hadoop
+zkServer.sh start//开启zookeeper
+start-hbase.sh//开启hbase
+都启动好之后，输入jps，若有：
+DataNode
+NodeManager
+SecondaryNameNode
+ResourceManager
+QuorumPeerMain
+HMaster
+NameNode
+HRegionServer
+Jps
+这几个进程，则暂时启动成功。
+此时输入hbase shell，进入命令行能成功执行list命令则安装成功。

@@ -1,0 +1,946 @@
+第一步：安装Hadoop集群
+
+1、搭建环境所需介质准备
+
+   Enterprise-R5-U4-Server-x86_64-dvd.iso
+
+   hadoop-1.1.1.tar.gz
+
+   jdk-6u26-linux-x64-rpm.bin
+
+
+
+2、创建5个节点的虚拟机
+
+   192.168.0.202  hd202  #NameNode
+
+   192.168.0.203  hd203  #SecondaryNameNode
+
+   192.168.0.204  hd204  #DataNode
+
+   192.168.0.205  hd205  #DataNode
+
+   192.168.0.206  hd206  #DataNode
+
+
+
+   虚拟机安装过程中，需要将sshd服务安装上。如果磁盘空间允许的话，尽可能的将系统包安装齐全了。
+
+
+
+3、在五个节点的虚拟机中都安装Jdk(以root用户安装)
+
+   [root@hd202 ~]# mkdir /usr/java
+
+   [root@hd202 ~]# mv jdk-6u26-linux-x64-rpm.bin /usr/java
+
+   [root@hd202 ~]# cd /usr/java
+
+   [root@hd202 java]# chmod 744 jdk-6u26-linux-x64-rpm.bin
+
+   [root@hd202 java]# ./jdk-6u26-linux-x64-rpm.bin
+
+   [root@hd202 java]# ln -s jdk1.6.0_26 default
+
+
+
+4、创建hadoop管理用户(5台虚拟机中都要创建用户)
+
+   [root@hd202 ~]# useradd cbcloud   #在没有先创建用户组的情况下，直接新增用户，用户默认所属的组和用户名相同。即cbcloud.cbcloud
+
+   [root@hd202 ~]# passwd cbcloud    #修改用户cbcloud的密码，测试环境可设置为111111
+
+
+
+5、编辑/etc/hosts文件(使用root用户分别在五台虚拟机上都编辑)
+
+   # Do not remove the following line, or various programs
+
+   # that require network functionality will fail.
+
+   127.0.0.1       localhost.localdomain localhost
+
+   ::1             localhost6.localdomain6 localhost6
+
+   192.168.0.202   hd202
+
+   192.168.0.203   hd203
+
+   192.168.0.204   hd204
+
+   192.168.0.205   hd205
+
+   192.168.0.206   hd206
+
+
+
+6、编辑/etc/sysconfig/network文件(使用root用户分别在五台虚拟机上都编辑)
+
+   NETWORKING=yes
+
+   NETWORKING_IPV6=no
+
+   HOSTNAME=hd202      #主机名(192.168.0.203上应该改为hd203，以此类推，五台机器都要修改为相应的名称)
+
+   GATEWAY=192.168.0.1
+
+   
+
+7、在五台机器之间配置用户等价性(以前面创建的用户cbcloud登陆进行操作)
+
+   [cbcloud@hd202 ~]$ mkdir .ssh
+
+   [cbcloud@hd202 ~]$ chmod 700 .ssh
+
+   [cbcloud@hd202 ~]$ ssh-keygen -t rsa
+
+   [cbcloud@hd202 ~]$ ssh-keygen -t dsa
+
+   [cbcloud@hd202 ~]$ cat ~/.ssh/id_rsa.pub > ~/.ssh/authorized_keys
+
+   [cbcloud@hd202 ~]$ cat ~/.ssh/id_dsa.pub > ~/.ssh/authorized_keys
+
+
+
+   [cbcloud@hd203 ~]$ mkdir .ssh
+
+   [cbcloud@hd203 ~]$ chmod 700 .ssh
+
+   [cbcloud@hd203 ~]$ ssh-keygen -t rsa
+
+   [cbcloud@hd203 ~]$ ssh-keygen -t dsa
+
+   [cbcloud@hd203 ~]$ cat ~/.ssh/id_rsa.pub > ~/.ssh/authorized_keys
+
+   [cbcloud@hd203 ~]$ cat ~/.ssh/id_dsa.pub > ~/.ssh/authorized_keys
+
+
+
+   [cbcloud@hd204 ~]$ mkdir .ssh
+
+   [cbcloud@hd204 ~]$ chmod 700 .ssh
+
+   [cbcloud@hd204 ~]$ ssh-keygen -t rsa
+
+   [cbcloud@hd204 ~]$ ssh-keygen -t dsa
+
+   [cbcloud@hd204 ~]$ cat ~/.ssh/id_rsa.pub > ~/.ssh/authorized_keys
+
+   [cbcloud@hd204 ~]$ cat ~/.ssh/id_dsa.pub > ~/.ssh/authorized_keys
+
+
+
+   [cbcloud@hd205 ~]$ mkdir .ssh
+
+   [cbcloud@hd205 ~]$ chmod 700 .ssh
+
+   [cbcloud@hd205 ~]$ ssh-keygen -t rsa
+
+   [cbcloud@hd205 ~]$ ssh-keygen -t dsa
+
+   [cbcloud@hd205 ~]$ cat ~/.ssh/id_rsa.pub > ~/.ssh/authorized_keys
+
+   [cbcloud@hd205 ~]$ cat ~/.ssh/id_dsa.pub > ~/.ssh/authorized_keys
+
+
+
+   [cbcloud@hd206 ~]$ mkdir .ssh
+
+   [cbcloud@hd206 ~]$ chmod 700 .ssh
+
+   [cbcloud@hd206 ~]$ ssh-keygen -t rsa
+
+   [cbcloud@hd206 ~]$ ssh-keygen -t dsa
+
+   [cbcloud@hd206 ~]$ cat ~/.ssh/id_rsa.pub > ~/.ssh/authorized_keys
+
+   [cbcloud@hd206 ~]$ cat ~/.ssh/id_dsa.pub > ~/.ssh/authorized_keys
+
+   
+
+   [cbcloud@hd202 ~]$ cd .ssh
+
+   [cbcloud@hd202 .ssh]$ scp authorized_keys  cbcloud@hd203:/home/cbcloud/.ssh/authorized_keys2  #将hd202机器上的authorized_keys文件远程复制到hd203上的/home/cbcloud/.ssh/目录下，并重命名为authorized_keys2
+
+   [cbcloud@hd203 ~]$ cd .ssh
+
+   [cbcloud@hd203 ~]$ cat authorized_keys2 > authorized_keys  #也就是将hd202上的authorized_keys中的内容合并到hd203机器上的authorized_keys文件中。
+
+
+
+    然后再将合并后的authorized_keys文件复制到hd204上，与204上的authorized_keys文件合并，依次类推，最后将5个节点的authorized_keys文件的内容都合并在一起以后，再将包含有五个节点密钥内容的authorized_keys文件，覆盖到其余4个节点上。
+
+
+
+    注意：authorized_keys文件的权限必须为644，否则用户等价性会失效。  
+
+ 
+
+    在五个节点上都执行以下命令：
+
+   [cbcloud@hd202 ~]$ cd .ssh
+
+   [cbcloud@hd202 ~]$ chmod 644 authorized_keys
+
+
+
+8、开始安装hadoop集群
+
+8.1 建立目录 (在五台虚拟机上都执行以下命令_使用root用户)
+
+    [root@hd202 ~]# mkdir /home/cbcloud/hdtmp
+
+    [root@hd202 ~]# mkdir /home/cbcloud/hddata
+
+    [root@hd202 ~]# mkdir /home/cbcloud/hdconf
+
+    [root@hd202 ~]# chown -R cbcloud:cbcloud /home/cbcloud/hdtmp
+
+    [root@hd202 ~]# chown -R cbcloud:cbcloud /home/cbcloud/hddata
+
+    [root@hd202 ~]# chown -R cbcloud:cbcloud /home/cbcloud/hdconf
+
+
+
+    [root@hd202 ~]# chmod -R 755 /home/cbcloud/hddata  #切记，hddata是用于DataNode节点存放数据用的，hadoop严格归定，这个目录的权限必须为755。如果不是这个权限值，则在后面启动DataNode时，将会因为权限不对，而不能成功启动DataNode节点。
+
+
+
+8.2 解压hadoop-1.1.1.tar.gz到/home/cbcloud目录下(只需要在hd202一台机器上执行即可)
+
+    [root@hd202 ~]# mv hadoop-1.1.1.tar.gz /home/cbcloud
+
+    [root@hd202 ~]# cd /home/cbcloud
+
+    [root@hd202 cbcloud]# tar -xzvf hadoop-1.1.1.tar.gz
+
+    [root@hd202 cbcloud]# mv hadoop-1.1.1 hadoop
+
+    [root@hd202 cbcloud]# chown -R cbcloud.cbcloud hadoop/
+
+
+
+8.3 配置系统环境变量/etc/profile(在五台虚拟机上都执行_使用root用户)
+
+    [root@hd202 ~]# vi /etc/profile
+
+    在文件尾部加入以下内容
+
+    export JAVA_HOME=/usr/java/default
+
+    export CLASSPATH=$CLASSPATH:$JAVA_HOME/lib:$JAVA_HOME/jre/lib
+
+    export PATH=$JAVA_HOME/bin:$JAVA_HOME/lib:$JAVA_HOME/jre/bin:$PATH:$HOME/bin
+
+    export HADOOP_HOME=/home/cbcloud/hadoop
+
+    export HADOOP_DEV_HOME=/home/cbcloud/hadoop 
+
+    export HADOOP_COMMON_HOME=/home/cbcloud/hadoop 
+
+    export HADOOP_HDFS_HOME=/home/cbcloud/hadoop 
+
+    export HADOOP_CONF_DIR=/home/cbcloud/hdconf
+
+    export HADOOP_HOME_WARN_SUPPRESS=1
+
+    export PATH=$PATH:$HADOOP_HOME/bin
+
+    export CLASSPATH=$CLASSPATH:$HADOOP_HOME/lib  
+
+
+
+8.4 配置用户环境变量
+
+    [cbcloud@hd202 ~]$ vi .bash_profile
+
+    在文件尾部加入以下内容
+
+    export JAVA_HOME=/usr/java/default
+
+    export CLASSPATH=$CLASSPATH:$JAVA_HOME/lib:$JAVA_HOME/jre/lib
+
+    export PATH=$JAVA_HOME/bin:$JAVA_HOME/lib:$JAVA_HOME/jre/bin:$PATH:$HOME/bin
+
+    export HADOOP_HOME=/home/cbcloud/hadoop
+
+    export HADOOP_DEV_HOME=/home/cbcloud/hadoop 
+
+    export HADOOP_COMMON_HOME=/home/cbcloud/hadoop 
+
+    export HADOOP_HDFS_HOME=/home/cbcloud/hadoop 
+
+    export HADOOP_CONF_DIR=/home/cbcloud/hdconf
+
+    export HADOOP_HOME_WARN_SUPPRESS=1
+
+    export PATH=$PATH:$HADOOP_HOME/bin
+
+    export CLASSPATH=$CLASSPATH:$HADOOP_HOME/lib  
+
+
+
+8.5 修改hadoop配置文件(使用cbcloud用户操作，并且只需要在hd202一台机器上操作) 
+
+    [cbcloud@hd202 ~]$ cp $HADOOP_HOME/conf/*   $HADOOP_CONF_DIR/*  
+
+    #从上一步的环境变量红色那一行可以看到，目前hadoop使用的配置文件应该位于/home/cbcloud/hdconf目录中，所以需要将/home/cbcloud/hadoop/conf目录下的所有配置文件都复制一份到/home/cbcloud/hdconf目录下。
+
+
+
+8.5.1  编辑core-site.xml配置文件
+
+    [cbcloud@hd202 ~]$ cd /home/cbcloud/hdconf
+
+    [cbcloud@hd202 hdconf]$ vi core-site.xml
+
+    <?xml version="1.0"?>
+
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+
+
+    <!-- Put site-specific property overrides in this file. -->
+
+
+
+    <configuration>
+
+      <property>
+
+        <name>fs.default.name</name>
+
+        <value>hdfs://hd202:9000</value>
+
+      </property>
+
+      <property>
+
+        <name>hadoop.tmp.dir</name>
+
+        <value>/home/cbcloud/hdtmp</value>
+
+      </property>
+
+    </configuration>
+
+
+
+8.5.2 编辑hdfs-site.xml
+
+    [cbcloud@hd202 hdconf]$ vi hdfs-site.xml
+
+    <?xml version="1.0"?>
+
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+
+
+    <!-- Put site-specific property overrides in this file. -->
+
+
+
+    <configuration>
+
+      <property>
+
+        <name>dfs.data.dir</name>
+
+        <value>/home/cbcloud/hddata</value>
+
+      </property>
+
+      <property>
+
+        <name>dfs.replication</name>
+
+        <value>3</value>
+
+      </property>
+
+    </configuration>
+
+
+
+8.5.3 编辑mapred-site.xml
+
+    [cbcloud@hd202 hdconf]$ vi mapred-site.xml
+
+    <?xml version="1.0"?>
+
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+
+
+    <!-- Put site-specific property overrides in this file. -->
+
+
+
+    <configuration>
+
+      <property>
+
+        <name>mapred.job.tracker</name>
+
+        <value>hd202:9001</value>
+
+      </property> 
+
+    </configuration>  
+
+
+
+8.5.4 编辑masters
+
+    [cbcloud@hd202 hdconf]$ vi masters
+
+    加入以下内容
+
+    hd203   # 因为hd203为SecondaryNameNode，所以在此只需要配置hd203即可，不需要配置hd202
+
+
+
+8.5.5 编辑slaves
+
+    [cbcloud@hd202 hdconf]$ vi slaves
+
+    加入以下内容
+
+    hd204
+
+    hd205
+
+    hd206
+
+
+
+8.6 复制/home/cbcloud/hadoop目录和/home/cbcloud/hdconf目录到其他四台虚拟机上
+
+    [cbcloud@hd202 hdconf]$ scp -r /home/cbcloud/hadoop hd203:/home/cbcloud  #由于前面配置了用户等价性，因此这条命令执行时不再需要密码
+
+    [cbcloud@hd202 hdconf]$ scp -r /home/cbcloud/hadoop hd204:/home/cbcloud
+
+    [cbcloud@hd202 hdconf]$ scp -r /home/cbcloud/hadoop hd205:/home/cbcloud
+
+    [cbcloud@hd202 hdconf]$ scp -r /home/cbcloud/hadoop hd206:/home/cbcloud
+
+
+
+    [cbcloud@hd202 hdconf]$ scp -r /home/cbcloud/hdconf hd203:/home/cbcloud
+
+    [cbcloud@hd202 hdconf]$ scp -r /home/cbcloud/hdconf hd204:/home/cbcloud
+
+    [cbcloud@hd202 hdconf]$ scp -r /home/cbcloud/hdconf hd205:/home/cbcloud
+
+    [cbcloud@hd202 hdconf]$ scp -r /home/cbcloud/hdconf hd206:/home/cbcloud   
+
+
+
+8.7 在NameNode(hd202)上执行命令格式化命令空间
+
+    [cbcloud@hd202 ~]$ cd $HADOOP_HOME/bin
+
+    [cbcloud@hd202 bin]$ hadoop namenode -format
+
+
+
+    如果控制台打印的信息中没有ERROR之灰的信息，表示格式化命名空间命令就执行成功了。
+
+
+
+8.8 启动hadoop
+
+    [cbcloud@hd202 ~]$ cd $HADOOP_HOME/bin
+
+    [cbcloud@hd202 bin]$ ./start-dfs.sh
+
+    starting namenode, logging to /home/cbcloud/hadoop/libexec/../logs/hadoop-cbcloud-namenode-hd202.out
+
+    hd204: starting datanode, logging to /home/cbcloud/hadoop/libexec/../logs/hadoop-cbcloud-datanode-hd204.out
+
+    hd205: starting datanode, logging to /home/cbcloud/hadoop/libexec/../logs/hadoop-cbcloud-datanode-hd205.out
+
+    hd206: starting datanode, logging to /home/cbcloud/hadoop/libexec/../logs/hadoop-cbcloud-datanode-hd206.out
+
+    hd203: starting secondarynamenode, logging to /home/cbcloud/hadoop/libexec/../logs/hadoop-cbcloud-secondarynamenode-hd203.out 
+
+
+
+8.9 启动mapred
+
+    [cbcloud@hd202 bin]$ ./start-mapred.sh 
+
+    starting jobtracker, logging to /home/cbcloud/hadoop/libexec/../logs/hadoop-cbcloud-jobtracker-hd202.out
+
+    hd204: starting tasktracker, logging to /home/cbcloud/hadoop/libexec/../logs/hadoop-cbcloud-tasktracker-hd204.out
+
+    hd205: starting tasktracker, logging to /home/cbcloud/hadoop/libexec/../logs/hadoop-cbcloud-tasktracker-hd205.out
+
+    hd206: starting tasktracker, logging to /home/cbcloud/hadoop/libexec/../logs/hadoop-cbcloud-tasktracker-hd206.out 
+
+
+
+8.10 查看进程
+
+    [cbcloud@hd202 bin]$ jps
+
+    4335 JobTracker
+
+    4460 Jps
+
+    4153 NameNode 
+
+
+
+    [cbcloud@hd203 hdconf]$ jps
+
+    1142 Jps
+
+    1078 SecondaryNameNode
+
+
+
+    [cbcloud@hd204 hdconf]$ jps
+
+    1783 Jps
+
+    1575 DataNode
+
+    1706 TaskTracker
+
+
+
+    [cbcloud@hd205 hdconf]$ jps
+
+    1669 Jps
+
+    1461 DataNode
+
+    1590 TaskTracker
+
+
+
+    [cbcloud@hd206 hdconf]$ jps
+
+    1494 DataNode
+
+    1614 TaskTracker
+
+    1694 Jps
+
+
+
+8.11 查看集群状态
+
+    [cbcloud@hd202 bin]$ hadoop dfsadmin -report
+
+    Configured Capacity: 27702829056 (25.8 GB)
+
+    Present Capacity: 13044953088 (12.15 GB)
+
+    DFS Remaining: 13044830208 (12.15 GB)
+
+    DFS Used: 122880 (120 KB)
+
+    DFS Used%: 0%
+
+    Under replicated blocks: 0
+
+    Blocks with corrupt replicas: 0
+
+    Missing blocks: 0
+
+
+
+    -------------------------------------------------
+
+    Datanodes available: 3 (3 total, 0 dead)
+
+
+
+    Name: 192.168.0.205:50010
+
+    Decommission Status : Normal
+
+    Configured Capacity: 9234276352 (8.6 GB)
+
+    DFS Used: 40960 (40 KB)
+
+    Non DFS Used: 4885942272 (4.55 GB)
+
+    DFS Remaining: 4348293120(4.05 GB)
+
+    DFS Used%: 0%
+
+    DFS Remaining%: 47.09%
+
+    Last contact: Wed Jan 30 18:02:17 CST 2013
+
+
+
+
+
+    Name: 192.168.0.206:50010
+
+    Decommission Status : Normal
+
+    Configured Capacity: 9234276352 (8.6 GB)
+
+    DFS Used: 40960 (40 KB)
+
+    Non DFS Used: 4885946368 (4.55 GB)
+
+    DFS Remaining: 4348289024(4.05 GB)
+
+    DFS Used%: 0%
+
+    DFS Remaining%: 47.09%
+
+    Last contact: Wed Jan 30 18:02:17 CST 2013
+
+
+
+    Name: 192.168.0.204:50010
+
+    Decommission Status : Normal
+
+    Configured Capacity: 9234276352 (8.6 GB)
+
+    DFS Used: 40960 (40 KB)
+
+    Non DFS Used: 4885987328 (4.55 GB)
+
+    DFS Remaining: 4348248064(4.05 GB)
+
+    DFS Used%: 0%
+
+    DFS Remaining%: 47.09%
+
+    Last contact: Wed Jan 30 18:02:17 CST 2013
+
+
+
+注意：如果报错“INFO ipc.Client: Retrying connect to server”,是因为core-site.xml失效的原因。停止，重启hadoop后，格式化namenode即可。
+
+另外，每次启动VM都要关闭防火墙。
+
+
+
+8.12 通过WEB浏览器查看Hadoop运行情况
+
+
+
+http://192.168.1.202:50070 查看Hadoop运行情况
+
+
+
+
+
+8.13 通过WEB浏览器查看Job运行情况
+
+http://192.168.0.202:50030 查看Job执行情况
+
+
+
+
+
+9、列出HDFS文件系统中存在的目录情况
+
+[cbcloud@hd202 logs]$ hadoop dfs -ls
+
+ls: Cannot access .: No such file or directory.
+
+上面的错误是因为被访问目录为空所致。
+
+
+
+可以改为执行hadoop fs -ls /
+
+
+
+[cbcloud@hd202 logs]$ hadoop fs -ls /
+
+Found 1 items
+
+drwxr-xr-x   - cbcloud supergroup          0 2013-01-30 15:52 /home
+
+可以看到有一条空结果
+
+
+
+执行hadoop fs -mkdir hello  #hello为文件夹的名字
+
+
+
+[cbcloud@hd202 logs]$ hadoop fs -mkdir hello
+
+[cbcloud@hd202 logs]$ hadoop fs -ls
+
+Found 1 items
+
+drwxr-xr-x   - cbcloud supergroup          0 2013-01-30 21:16 /user/cbcloud/hello
+
+
+
+10、HDFS使用测试
+
+[cbcloud@hd202 logs]$ hadoop dfs -rmr hello
+
+Deleted hdfs://hd202:9000/user/cbcloud/hello    #删除前面创建的文件夹
+
+
+
+[cbcloud@hd202 logs]$ hadoop dfs -mkdir input
+
+[cbcloud@hd202 logs]$ hadoop dfs -ls
+
+Found 1 items
+
+drwxr-xr-x   - cbcloud supergroup          0 2013-01-30 21:18 /user/cbcloud/input
+
+
+
+11、运行Hadoop自带框架的wordcount示例
+
+11.1、建立数据文件
+
+在主机192.168.0.202虚拟机中建立两个文件input1和input2
+
+[cbcloud@hd202 hadoop]$ echo "Hello Hadoop in input1" > input1
+
+[cbcloud@hd202 hadoop]$ echo "Hello Hadoop in input2" > input2
+
+
+
+11.2、发布数据文件至Hadoop集群上
+
+1、在HDFS中建立一个input目录
+
+[cbcloud@hd202 hadoop]$ hadoop dfs -mkdir input
+
+2、将文件input1和input2拷贝到HDFS的input目录下
+
+[cbcloud@hd202 hadoop]$ hadoop dfs -copyFromLocal /home/cbcloud/hadoop/input* input
+
+3、查看input目录下有没有复制成功
+
+[cbcloud@hd202 hadoop]$ hadoop dfs -ls input
+
+Found 2 items
+
+-rw-r--r--   3 cbcloud supergroup         23 2013-01-30 21:28 /user/cbcloud/input/input1
+
+-rw-r--r--   3 cbcloud supergroup         23 2013-01-30 21:28 /user/cbcloud/input/input2
+
+
+
+11.3、执行wordcount程序  #确保HDFS上没有output目录，查看结果
+
+[cbcloud@hd202 hadoop]$ hadoop jar hadoop-examples-1.1.1.jar wordcount input output
+
+
+13/01/30 21:33:05 INFO input.FileInputFormat: Total input paths to process : 2
+
+13/01/30 21:33:05 INFO util.NativeCodeLoader: Loaded the native-hadoop library
+
+13/01/30 21:33:05 WARN snappy.LoadSnappy: Snappy native library not loaded
+
+13/01/30 21:33:07 INFO mapred.JobClient: Running job: job_201301302110_0001
+
+13/01/30 21:33:08 INFO mapred.JobClient:  map 0% reduce 0%
+
+13/01/30 21:33:32 INFO mapred.JobClient:  map 50% reduce 0%
+
+13/01/30 21:33:33 INFO mapred.JobClient:  map 100% reduce 0%
+
+13/01/30 21:33:46 INFO mapred.JobClient:  map 100% reduce 100%
+
+13/01/30 21:33:53 INFO mapred.JobClient: Job complete: job_201301302110_0001
+
+13/01/30 21:33:53 INFO mapred.JobClient: Counters: 29
+
+13/01/30 21:33:53 INFO mapred.JobClient:   Job Counters 
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Launched reduce tasks=1
+
+13/01/30 21:33:53 INFO mapred.JobClient:     SLOTS_MILLIS_MAPS=29766
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Total time spent by all reduces waiting after reserving slots (ms)=0
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Total time spent by all maps waiting after reserving slots (ms)=0
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Launched map tasks=2
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Data-local map tasks=2
+
+13/01/30 21:33:53 INFO mapred.JobClient:     SLOTS_MILLIS_REDUCES=13784
+
+13/01/30 21:33:53 INFO mapred.JobClient:     File Output Format Counters 
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Bytes Written=40
+
+13/01/30 21:33:53 INFO mapred.JobClient:     FileSystemCounters
+
+13/01/30 21:33:53 INFO mapred.JobClient:     FILE_BYTES_READ=100
+
+13/01/30 21:33:53 INFO mapred.JobClient:     HDFS_BYTES_READ=262
+
+13/01/30 21:33:53 INFO mapred.JobClient:     FILE_BYTES_WRITTEN=71911
+
+13/01/30 21:33:53 INFO mapred.JobClient:     HDFS_BYTES_WRITTEN=40
+
+13/01/30 21:33:53 INFO mapred.JobClient:     File Input Format Counters 
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Bytes Read=46
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Map-Reduce Framework
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Map output materialized bytes=106
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Map input records=2
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Reduce shuffle bytes=106
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Spilled Records=16
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Map output bytes=78
+
+13/01/30 21:33:53 INFO mapred.JobClient:     CPU time spent (ms)=5500
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Total committed heap usage (bytes)=336928768
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Combine input records=8
+
+13/01/30 21:33:53 INFO mapred.JobClient:     SPLIT_RAW_BYTES=216
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Reduce input records=8
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Reduce input groups=5
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Combine output records=8
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Physical memory (bytes) snapshot=417046528
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Reduce output records=5
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Virtual memory (bytes) snapshot=1612316672
+
+13/01/30 21:33:53 INFO mapred.JobClient:     Map output records=8
+
+    
+
+   
+
+[cbcloud@hd202 hadoop]$ hadoop dfs -ls output
+
+Found 2 items
+
+-rw-r--r--   3 cbcloud supergroup          0 2013-01-30 21:33 /user/cbcloud/output/_SUCCESS
+
+-rw-r--r--   3 cbcloud supergroup         40 2013-01-30 21:33 /user/cbcloud/output/part-r-00000
+
+[cbcloud@hd202 hadoop]$ hadoop dfs -cat output/part-r-00000
+
+Hadoop  2
+
+Hello   2
+
+in      2
+
+input1  1
+
+input2  1
+
+    
+
+
+
+第二步：搭建Zookeeper集群环境
+
+
+
+上一篇关于Hadoop1.1.1集群安装记录中已经详细记录了在Oracle Linux 5.4 64bit上搭建Hadoop集群的方法。现在接着上一篇的内容，进一步安装Zookeeper和HBASE
+
+
+
+1、安装zookeeper (在hd202上安装)
+
+1.1、准备安装介质zookeeper-3.4.5.tar.gz
+
+1.2、使用cbcloud用户将介质上传到hd202虚拟机上的/home/cbcloud/目录下面
+
+1.3、解压缩zookeeper-3.4.5.tar.gz
+
+[cbcloud@hd202 ~]$ tar zxvf zookeeper-3.4.5.tar.gz
+
+1.4、在hd204、hd205、hd206三台机器上创建目录
+
+[cbcloud@hd204 ~]$ mkdir /home/cbcloud/zookeeperdata
+
+[cbcloud@hd205 ~]$ mkdir /home/cbcloud/zookeeperdata
+
+[cbcloud@hd206 ~]$ mkdir /home/cbcloud/zookeeperdata
+
+
+
+1.5、在hd202上执行以下内容
+
+[cbcloud@hd202 ~]$ mv zookeeper-3.4.5 zookeeper
+
+[cbcloud@hd202 ~]$ cd zookeeper/conf
+
+[cbcloud@hd202 ~]$ mv zoo_sample.cfg zoo.cfg
+
+[cbcloud@hd202 ~]$ vi zoo.cfg
+
+# The number of milliseconds of each tick
+
+tickTime=2000
+
+# The number of ticks that the initial
+
+# synchronization phase can take
+
+initLimit=10
+
+# The number of ticks that can pass between
+
+# sending a request and getting an acknowledgement
+
+syncLimit=5
+
+# the directory where the snapshot is stored.
+
+# do not use /tmp for storage, /tmp here is just
+
+# example sakes.
+
+dataDir=/home/cbcloud/zookeeperdata
+
+# the port at which the clients will connect
+
+clientPort=2181
+
+server.1=hd204:2888:3888
+
+server.2=hd205:2888:3888
+
+server.3=hd206:2888:3888
+
+#
+
+# Be sure to read the maintenance section of the
+
+# administrator guide before turning on autopurge.
+
+#
+
+# http://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_maintenance
+
+#
+
+# The number of snapshots to retain in dataDir
+
+#autopurge.snapRetainCount=3
+
+# Purge task interval in hours
