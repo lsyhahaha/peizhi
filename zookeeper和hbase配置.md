@@ -72,3 +72,4 @@ chmod u+x myzookeeper.sh
 8.安装完成
 
 ![image-20220318001740468](images/image-20220318001740468.png)
+
