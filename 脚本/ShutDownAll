@@ -1,0 +1,13 @@
+#!/bin/bash
+
+hostarr = (hadoop100, hadoop101m hadoop102)
+echo "============<进入hadoop102>=========="
+	ssh hostarr[2] shutdown now 
+echo "============<关闭hadoop102>=========="
+
+echo "============<进入hadoop101>=========="
+        ssh hostarr[1] shutdown now
+echo "============<关闭hadoop101>=========="
+
+echo "============<关闭本机>==============="
+	shutdown now
